@@ -16,6 +16,23 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 BASE_TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 
+# ===============================
+# New routes for status checks
+# ===============================
+
+@app.route("/", methods=["GET"])
+def index():
+    return {"message": "Backend running"}, 200
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return {"status": "ok"}, 200
+
+
+# ===============================
+# Existing routes
+# ===============================
+
 @app.route("/send-to-telegram", methods=["POST"])
 def send_to_telegram():
     try:
@@ -77,6 +94,10 @@ def echo():
     data = request.get_json(silent=True) or {}
     return jsonify({"you_sent": data}), 200
 
+
+# ===============================
+# Entrypoint
+# ===============================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
