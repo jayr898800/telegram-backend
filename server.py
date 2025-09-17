@@ -17,7 +17,7 @@ BASE_TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 
 # ===============================
-# New routes for status checks
+# Health routes
 # ===============================
 
 @app.route("/", methods=["GET"])
@@ -30,7 +30,7 @@ def health():
 
 
 # ===============================
-# Existing routes
+# Send to Telegram
 # ===============================
 
 @app.route("/send-to-telegram", methods=["POST"])
@@ -39,7 +39,7 @@ def send_to_telegram():
         # Accept both form-data and raw JSON
         data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
 
-        # Build the message with emojis
+        # Build the formatted message
         message = (
             "🔧 *New Service Request*\n\n"
             f"👤 *Name*: {data.get('name', '')}\n"
@@ -52,9 +52,11 @@ def send_to_telegram():
             f"📝 *Desc*: {data.get('issue_desc', '')}"
         )
 
-        # ✅ If a photo is uploaded → send it with caption
+        # ✅ Handle photo upload correctly
         if "photo" in request.files:
             photo = request.files["photo"]
+
+            # Send as multipart form-data with caption
             send_photo_url = f"{BASE_TELEGRAM_URL}/sendPhoto"
             photo_resp = requests.post(
                 send_photo_url,
@@ -63,15 +65,16 @@ def send_to_telegram():
                     "caption": message,
                     "parse_mode": "Markdown"
                 },
-                files={"photo": photo}
+                files={"photo": (photo.filename, photo.stream, photo.mimetype)}
             )
+
             return jsonify({
                 "success": True,
                 "message": "Photo + caption sent to Telegram",
                 "telegram_response": photo_resp.json()
             }), 200
 
-        # ✅ Otherwise just send text
+        # ✅ Fallback: send as text only
         send_msg_url = f"{BASE_TELEGRAM_URL}/sendMessage"
         msg_resp = requests.post(send_msg_url, json={
             "chat_id": CHAT_ID,
