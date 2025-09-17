@@ -16,10 +16,6 @@ CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 BASE_TELEGRAM_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 
-# ===============================
-# Health routes
-# ===============================
-
 @app.route("/", methods=["GET"])
 def index():
     return {"message": "Backend running"}, 200
@@ -29,15 +25,15 @@ def health():
     return {"status": "ok"}, 200
 
 
-# ===============================
-# Send to Telegram
-# ===============================
-
 @app.route("/send-to-telegram", methods=["POST"])
 def send_to_telegram():
     try:
         # Accept both form-data and raw JSON
         data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+
+        # Debug: log incoming form data
+        app.logger.info(f"Incoming form data: {data}")
+        app.logger.info(f"Incoming files: {list(request.files.keys())}")
 
         # Build the formatted message
         message = (
@@ -52,11 +48,11 @@ def send_to_telegram():
             f"📝 *Desc*: {data.get('issue_desc', '')}"
         )
 
-        # ✅ Handle photo upload correctly
+        # ✅ Handle photo upload
         if "photo" in request.files:
             photo = request.files["photo"]
+            app.logger.info(f"Photo received: filename={photo.filename}, mimetype={photo.mimetype}")
 
-            # Send as multipart form-data with caption
             send_photo_url = f"{BASE_TELEGRAM_URL}/sendPhoto"
             photo_resp = requests.post(
                 send_photo_url,
@@ -67,6 +63,8 @@ def send_to_telegram():
                 },
                 files={"photo": (photo.filename, photo.stream, photo.mimetype)}
             )
+
+            app.logger.info(f"Telegram sendPhoto response: {photo_resp.text}")
 
             return jsonify({
                 "success": True,
@@ -81,6 +79,9 @@ def send_to_telegram():
             "text": message,
             "parse_mode": "Markdown"
         })
+
+        app.logger.info(f"Telegram sendMessage response: {msg_resp.text}")
+
         return jsonify({
             "success": True,
             "message": "Message sent to Telegram",
@@ -88,19 +89,15 @@ def send_to_telegram():
         }), 200
 
     except Exception as e:
+        app.logger.error(f"Error in send_to_telegram: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route("/api/echo", methods=["POST"])
 def echo():
-    """Test endpoint for Kivy app"""
     data = request.get_json(silent=True) or {}
     return jsonify({"you_sent": data}), 200
 
-
-# ===============================
-# Entrypoint
-# ===============================
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
